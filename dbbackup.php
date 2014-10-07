@@ -5,7 +5,7 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 /**
- * @version 1.0
+ * @version 1.0.1
  * Creates database backups based on a configuration file.
  * Reads in a configuration file (in "ini" format)
  * The file can contain a [Global] section to specify settings globally.
@@ -72,7 +72,12 @@ $config_help = array(
 		'label' => 'Password',
 		'description' => 'The password for connecting to the database',
 		'default' => null
-	)	
+	),
+	'filebase' => array(
+		'label' => 'File name base',
+		'description' => 'The file base name to be used as the backup name',
+		'default' => 'The section name'
+	)
 );
 
 if ($display_help) {
@@ -100,7 +105,9 @@ foreach($configs as $section => $settings) {
 		$pasword = get_setting($config, 'password');
 		
 		// Generated values
-		$filebase = $database;
+		$filebase = get_setting($config, 'filebase', '');
+		if (empty($filebase)) $filebase = preg_replace('/[^a-z]+/i', '', $section);
+		
 		$backup_filename = sprintf('%s-%s%s', $filebase, date('YmdHis'), $file_extension);
 		$backup_file_path = $backup_path . $backup_filename;
 		$config['backup_filename'] = $backup_filename;
