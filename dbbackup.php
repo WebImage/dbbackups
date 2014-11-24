@@ -5,7 +5,7 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 /**
- * @version 1.0.1
+ * @version 1.1
  * Creates database backups based on a configuration file.
  * Reads in a configuration file (in "ini" format)
  * The file can contain a [Global] section to specify settings globally.
@@ -15,6 +15,10 @@ error_reporting(E_ALL);
  * backupcommand - The command called 
  **/
 define('SECTION_GLOBAL', 'Global');
+define('AGE_GROUP_YEAR', 'year');
+define('AGE_GROUP_MONTH', 'month');
+define('AGE_GROUP_WEEK', 'week');
+define('AGE_GROUP_DAY', 'day');
 
 $dir = dirname(__FILE__) . DIRECTORY_SEPARATOR;
 chdir($dir);
@@ -133,21 +137,26 @@ foreach($configs as $section => $settings) {
 			}
 			
 		}
-		
-		
-		
+				
 		// Cleanup old files
 		$dh = opendir($backup_path);
 		$pattern = '#' . $filebase . '\-([0-9]{14})' .  $file_extension . '#'; // backup file pattern
 		
 		#$keep_pattern = get_setting($config, 'keep');
+		$keep_yearly = get_asterisk_numeric_setting($config, 'keepyearly');
 		$keep_monthly = get_asterisk_numeric_setting($config, 'keepmonthly');
 		$keep_weekly = get_asterisk_numeric_setting($config, 'keepweekly');
 		$keep_daily = get_asterisk_numeric_setting($config, 'keepdaily');
 		
-		#$keep_day_of_week = get_numeric_setting($config, 'keepdayofweek');
-		
-		#$keep_delay = get_numeric_setting($config, 'keepdelay'); // The amount of time (in days) to wait before factoring in $keep_X values
+		// Keep track of files that are currently being backed up
+		$file_refs = array();
+		// Keep track of ages of files (keyed with 'year', 'month', 'week'
+		$file_age_groups = array(
+			AGE_GROUP_YEAR => array(),
+			AGE_GROUP_MONTH => array(),
+			AGE_GROUP_WEEK => array(),
+			AGE_GROUP_DAY => array()
+		);
 		
 		while(false !== ($file = readdir($dh))) {
 			
@@ -177,52 +186,130 @@ foreach($configs as $section => $settings) {
 				$now = time();
 				$age_seconds = $now - $tm_backup_date;
 				
-				$keep = false;
-				
-				$age_months = 0;
+				$age_years = 0;
+				$age_months = -1;
 				$current = $tm_backup_date;
 				while ($current < $now) {
 					$age_months ++;
 					$current = strtotime('+1 month', $current);
 				}
+				#$age_months = ( (intval(date('Y')) - $backup_year) * 12 ) + (intval(date('m')) - $backup_month);
 				
 				$age_days = floor(($age_seconds) / (60 * 60 * 24));
 				$age_weeks = floor($age_days / 7);
+				$age_years = floor($age_days / 365);
 				
-				$desc = 'DELETE';
+				if (!isset($file_refs[$file])) $file_refs[$file] = 0;
 				
-				if (empty($keep_monthly) && empty($keep_weekly) && empty($keep_daily)) {
+				// Setup age groups and values that we need to iterate over to check whether this file should be kept
+				$age_groups = array(
+					AGE_GROUP_YEAR => $age_years,
+					AGE_GROUP_MONTH => $age_months,
+					AGE_GROUP_WEEK => $age_weeks,
+					AGE_GROUP_DAY => $age_days
+				);
+				
+				// Look at each age group
+				foreach($age_groups as $age_group => $age_val) {
 					
-					$desc = 'ALL EMPTY';
-					$keep = true;
-					
-				} else {
-					
-					// Make sure we should be processing "keep" values
-					
-					// Keep as monthly file?
-					if (!empty($keep_monthly) && ($keep_monthly == '*' || $age_months < $keep_monthly) && $backup_day == $keep_day_of_month) {
-						$desc = 'MONTHLY';
-						$keep = true;
-					} else if (!empty($keep_weekly) && ($keep_weekly = '*' || $age_weeks < $keep_weekly) && $backup_day_of_week == $keep_day_of_week) {
-						$desc = 'WEEK';
-						$keep = true;
-					} else if (!empty($keep_daily) && ($keep_daily == '*' || $age_days <= $keep_daily)) {
-						$desc = 'DAILY';
-						$keep = true;
+					$add_ref = false;
+					if (isset($file_age_groups[$age_group][$age_val])) {
+						
+						if ($age_days > $file_age_groups[$age_group][$age_val]['age_days']) {
+							$old_file = $file_age_groups[$age_group][$age_val]['file'];
+							// Decrease reference count for old file
+							$file_refs[$old_file] --;
+							$add_ref = true;
+						}
+						
+					} else {
+						$add_ref = true;
 					}
-							
+					
+					if ($add_ref) {
+						$file_age_groups[$age_group][$age_val] = array(
+							'file' => $file,
+							'age_days' => $age_days
+						);
+						$file_refs[$file] ++;
+					}
 					
 				}
 				
-				echo 'File: ' . $file . '; Age Months: ' . $age_months . '; Age Weeks: ' . $age_weeks . '; Age Days: ' . $age_days . '; Keep: ' . ($keep?'YES':'NO') . ' (' . $desc . ')' . PHP_EOL;
-				if (!$is_debugging && !$keep) unlink($file);
+				
 				
 				
 			}
 		}
+		
+		// Close out directory handle
 		closedir($dh);
+		
+		// Setup initial structure for how to process archived files
+		$archived_backups = array();
+		foreach($file_refs as $file=>$count) {
+			$archived_backups[$file] = array(
+				'start_count' => $count, // The count at the start of processing
+				'count' => $count, // The count after processing
+				'kept_reasons' => array() // The reasons the file was kept
+			);
+		}
+		
+		// Setup groups to be processed and their $max_age values
+		$age_groups = array(
+			AGE_GROUP_YEAR => $keep_yearly,
+			AGE_GROUP_MONTH => $keep_monthly,
+			AGE_GROUP_WEEK => $keep_weekly,
+			AGE_GROUP_DAY => $keep_daily
+		);
+		
+		// Process each age group and associated files
+		foreach($age_groups as $age_group => $max_age) {
+			
+			// If the specific age group is not a defined key then skip this iteration
+			if (!isset($file_age_groups[$age_group])) continue;
+			
+			$ages = $file_age_groups[$age_group];
+			
+			foreach($ages as $age => $file_info) {
 				
+				$file = $file_info['file'];
+				
+				/*
+				 * Do not keep files where the $max_age is not defined
+				 * Keep files that are less than $max_age
+				 * Keep files with any non-numeric value (the convention should be to use an asterisk "*")
+				 */
+				if ( 
+					empty($max_age) || 
+					(is_numeric($max_age) && $age > $max_age)
+				) {
+					
+					$archived_backups[$file]['count'] --;
+					
+				} else {
+					
+					$archived_backups[$file]['kept_reasons'][] = $age_group;
+					
+				}
+				
+			}
+			
+		}
+		
+		foreach($archived_backups as $file => $file_info) {
+			
+			if ($file_info['count'] == 0) {
+				
+				if (!$is_debugging && !$keep) unlink($file);
+				
+			} else {
+				echo 'Kept: ' . $file . ' because: ' . implode(', ', $file_info['kept_reasons']);
+				echo PHP_EOL;
+			}
+			
+		}
+		
 	}
 
 }
