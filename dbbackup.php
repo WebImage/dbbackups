@@ -5,7 +5,7 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 /**
- * @version 1.1
+ * @version 1.1.1
  * Creates database backups based on a configuration file.
  * Reads in a configuration file (in "ini" format)
  * The file can contain a [Global] section to specify settings globally.
@@ -41,7 +41,7 @@ $configs = $ignore_file_check ? array() : parse_ini_file($config_file_path, $pro
 
 $default_settings = array(
 	'fileextension' => '.sql.gz',
-	'command' => 'mysqldump -h $host -u $username -p$password $arguments $database | gzip > $backup_file_path',
+	'command' => 'mysqldump -h $host -u $username -p$password $database $arguments | gzip > $backup_file_path',
 	'host' => 'localhost',
 	'arguments' => '',
 );
