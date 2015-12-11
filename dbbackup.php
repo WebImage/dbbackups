@@ -5,7 +5,7 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 /**
- * @version 1.1
+ * @version 1.1.1
  * Creates database backups based on a configuration file.
  * Reads in a configuration file (in "ini" format)
  * The file can contain a [Global] section to specify settings globally.
