@@ -41,7 +41,7 @@ $configs = $ignore_file_check ? array() : parse_ini_file($config_file_path, $pro
 
 $default_settings = array(
 	'fileextension' => '.sql.gz',
-	'command' => 'mysqldump -h $host -u $username -p$password $arguments $database | gzip > $backup_file_path',
+	'command' => 'mysqldump -h $host -u $username -p$password $database $arguments | gzip > $backup_file_path',
 	'host' => 'localhost',
 	'arguments' => '',
 );
