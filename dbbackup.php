@@ -4,6 +4,8 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+set_time_limit(0);
+
 /**
  * @version 1.1.1
  * Creates database backups based on a configuration file.
