@@ -304,7 +304,7 @@ foreach($configs as $section => $settings) {
 			
 			if ($file_info['count'] == 0) {
 				
-				if (!$is_debugging && !$keep) unlink($file);
+				if (!$is_debugging && !$keep) unlink($backup_path . $file);
 				
 			} else {
 				echo 'Kept: ' . $file . ' because: ' . implode(', ', $file_info['kept_reasons']);
