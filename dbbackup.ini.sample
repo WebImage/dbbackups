@@ -1,0 +1,14 @@
+[Global]
+bin = /usr/bin/mysqldump
+backuppath = /path/to/backups
+keepyearly = *
+keepmonthly = 12
+keepweekly = 4
+keepdaily = 7
+
+[AnyLabelForDbConfig]
+host = localhost
+database = database_name
+username = db_user
+password = db_pass
+arguments = --tables various table names separated by space
