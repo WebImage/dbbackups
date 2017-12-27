@@ -138,7 +138,24 @@ foreach($configs as $section => $settings) {
 		echo 'Run Command: ' . $command . PHP_EOL;
 		
 		// Run command
-		if (!$is_debugging) $response = `$command`;
+		if (!$is_debugging) {
+			$output = array();
+			exec($command, $output, $worked);
+			switch($worked) {
+				case 0:
+					echo 'Database ' . $database . ' backed up' . PHP_EOL;
+					break;
+				case 1:
+					echo 'There was a warning during the export of ' . $database . PHP_EOL;
+					break;
+				case 2:
+					echo 'There was an error during export please check your values' . PHP_EOL;
+					break;
+				default:
+					echo 'Some other output condition: ' . $worked . PHP_EOL;
+			}
+			#$response = `$command`;
+		}
 		
 		// Output
 		if ($is_debugging) {
@@ -303,7 +320,7 @@ foreach($configs as $section => $settings) {
 		foreach($archived_backups as $file => $file_info) {
 			
 			if ($file_info['count'] == 0) {
-				if (!$is_debugging && !$keep) unlink($file);
+				if (!$is_debugging && !$keep) unlink($backup_path . $file);
 			} else {
 				echo 'Kept: ' . $file . ' because: ' . implode(', ', $file_info['kept_reasons']);
 				echo PHP_EOL;
