@@ -6,6 +6,8 @@ error_reporting(E_ALL);
 
 set_time_limit(0);
 
+require(__DIR__.'/autoload.php');
+
 /**
  * @version 1.1.1
  * Creates database backups based on a configuration file.
@@ -22,12 +24,18 @@ define('AGE_GROUP_MONTH', 'month');
 define('AGE_GROUP_WEEK', 'week');
 define('AGE_GROUP_DAY', 'day');
 
+$args = ArgumentParser::create(['debug', 'help']);
 $dir = dirname(__FILE__) . DIRECTORY_SEPARATOR;
 chdir($dir);
 $filename = basename(__FILE__);
-$config_file_path = count($argv) > 1 ? $argv[count($argv)-1] : $dir . $filename . '.conf';
-$is_debugging = in_array('--debug', $argv); // 
-$display_help = in_array('-help', $argv) || in_array('--help', $argv); // Display the configuration help options
+
+$profile = $args->getFlag('profile');
+
+
+$config_file_path = null === $args->getValue() ? $dir . $filename . '.conf' : $args->getValue();
+$is_debugging = $args->isFlagSet('debug');
+$display_help = $args->isFlagSet('help'); // Display the configuration help options
+
 $config_exists = file_exists($config_file_path);
 $ignore_file_check = false;
 if ($display_help) {
@@ -96,10 +104,13 @@ $global_settings = isset($configs[SECTION_GLOBAL]) ? $configs[SECTION_GLOBAL] : 
 
 $app_settings = array_merge($default_settings, $global_settings);
 
+if (null !== $profile && !isset($configs[$profile])) die(sprintf('Specified profile cannot be found: %s', $profile) . PHP_EOL);
+
 foreach($configs as $section => $settings) {
 	
 	if ($section != SECTION_GLOBAL) {
-		
+	    if (null !== $profile && $profile != $section) continue;
+
 		$config = array_merge($app_settings, $settings);
 		
 		$backup_path = get_setting($config, 'backuppath');
@@ -236,12 +247,7 @@ foreach($configs as $section => $settings) {
 						);
 						$file_refs[$file] ++;
 					}
-					
 				}
-				
-				
-				
-				
 			}
 		}
 		
@@ -287,34 +293,23 @@ foreach($configs as $section => $settings) {
 					empty($max_age) || 
 					(is_numeric($max_age) && $age > $max_age)
 				) {
-					
 					$archived_backups[$file]['count'] --;
-					
 				} else {
-					
 					$archived_backups[$file]['kept_reasons'][] = $age_group;
-					
 				}
-				
 			}
-			
 		}
 		
 		foreach($archived_backups as $file => $file_info) {
 			
 			if ($file_info['count'] == 0) {
-				
 				if (!$is_debugging && !$keep) unlink($file);
-				
 			} else {
 				echo 'Kept: ' . $file . ' because: ' . implode(', ', $file_info['kept_reasons']);
 				echo PHP_EOL;
 			}
-			
 		}
-		
 	}
-
 }
 /**
  * Required functions
@@ -367,9 +362,11 @@ function display_help($config_help) {
 		echo str_repeat(' ', $name_col_len) . 'Default: ' . $default . PHP_EOL;
 	}
 }
+
 function get_raw_setting(array $settings, $key, $default=null) {
 	return (isset($settings[$key])) ? $settings[$key] : $default;
 }
+
 function get_setting(array $settings, $key, $default=null) {
 	$value = get_raw_setting($settings, $key, $default);
 
@@ -380,27 +377,30 @@ function get_setting(array $settings, $key, $default=null) {
 			
 			if (null === $sub_value) throw new RuntimeException('Unable to lookup value for ' . $matches[0][$i]);
 			$value = str_replace($matches[0][$i], $sub_value, $value);
-
 		}
-		
 	}
+
 	return $value;
 }
+
 function get_numeric_setting(array $settings, $key, $default=null) {
 	$value = get_setting($settings, $key, $default);
 	if (!is_numeric($value)) $value = $default;
 	return $value;
 }
+
 function get_asterisk_numeric_setting(array $settings, $key, $default=null) {
 	$value = get_setting($settings, $key, $default);
 	if (!is_numeric($value) && $value != '*') $value = $default;
+
 	return $value;
 }
-function calculate_config($settings) {
 
+function calculate_config($settings) {
 	foreach($settings as $key => $value) {
 		$value = get_setting($settings, $key);
 		$settings[$key] = $value;
 	}
+
 	return $settings;
 }
