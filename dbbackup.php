@@ -52,7 +52,7 @@ $configs = $ignore_file_check ? array() : parse_ini_file($config_file_path, $pro
 $default_settings = array(
 	'fileextension' => '.sql.gz',
 	'bin' => 'mysqldump',
-	'command' => '$bin -h $host -u $username -p$password $database $arguments | gzip > $backup_file_path',
+	'command' => '$bin -h $host -u $username -p\'$password\' $database $arguments | gzip > $backup_file_path',
 	'host' => 'localhost',
 	'arguments' => '',
 );
@@ -132,7 +132,7 @@ foreach($configs as $section => $settings) {
 		$config['backup_file_path'] = $backup_file_path;
 		
 		$command = get_setting($config, 'command');
-		
+
 		if ($is_debugging) echo sprintf('[%s]', $section) . PHP_EOL . '     ';
 		
 		echo 'Run Command: ' . $command . PHP_EOL;
